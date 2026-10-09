@@ -1,11 +1,32 @@
-<div align="center">
+# Academic Performances Tracker
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+A simple grade tracker that plots your scores on a bar chart and highlights your lowest-scoring topics with practice quizzes and study suggestions.
 
-  <h1>Built with AI Studio</h2>
+## Run Locally
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+```bash
+npm install
+npm run dev
+```
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-</div>
+To use the AI study assistant locally, add your Gemini API key in `.env`:
+```bash
+GEMINI_API_KEY=your_key_here
+```
+
+## Deploy to Netlify
+
+1. **Push this repo to GitHub**.
+2. **Import into Netlify**:
+   - In Netlify, click **Add new site > Import an existing project** and select your GitHub repo.
+   - **Build command**: leave blank (or `echo "Ready"`)
+   - **Publish directory**: `.` (or leave blank)
+   - **Functions directory**: `netlify/functions` (auto-detected from `netlify.toml`)
+3. **Environment Variables**:
+   - Go to **Site configuration > Environment variables**.
+   - Add `GEMINI_API_KEY` with your Gemini API key value.
+4. **Deploy**:
+   - Click **Deploy site**.
+   - Netlify serves the static site and deploys the serverless study coach function at `/.netlify/functions/chat` (rewritten to `/api/chat`).
