@@ -140,9 +140,16 @@ export default async function chatHandler(req, res) {
     const reply = response?.text || '';
     return res.status(200).json({ response: reply });
   } catch (error) {
-    console.error('Error handling Gemini chat request:', error);
+    console.error('Error handling Gemini chat request:', error?.message || error);
+    // Sanitize any error output so no API keys or internal credentials can ever leak to the client
+    const rawError = String(error?.message || '');
+    const cleanError = rawError
+      .replace(/AIza[a-zA-Z0-9_\-]{35}/g, '[REDACTED_KEY]')
+      .replace(/key=[^&\s]+/gi, 'key=[HIDDEN]')
+      .replace(/https?:\/\/[^\s]+/gi, '[SECURE_SERVICE]');
+
     return res.status(500).json({
-      error: error.message || 'Failed to generate response from Gemini API',
+      error: cleanError || 'A temporary error occurred while processing your study question. Please try again.',
     });
   }
 }

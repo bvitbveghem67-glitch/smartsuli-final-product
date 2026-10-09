@@ -1,11 +1,28 @@
 import { GoogleGenAI } from '@google/genai';
 
 export async function handler(event, context) {
-  if (event.httpMethod !== 'POST') {
+  // Handle preflight OPTIONS requests cleanly with CORS headers
+  if (event.httpMethod === 'OPTIONS') {
     return {
-      statusCode: 405,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Method Not Allowed' }),
+      statusCode: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+      body: '',
+    };
+  }
+
+  // Handle health-check or status GET requests with 200 OK
+  if (event.httpMethod === 'GET') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({ status: 'active', service: 'Academic Study Assistant API' }),
     };
   }
 
@@ -150,11 +167,20 @@ export async function handler(event, context) {
       body: JSON.stringify({ response: reply }),
     };
   } catch (error) {
-    console.error('Netlify function error:', error);
+    console.error('Netlify function error:', error?.message || error);
+    const rawError = String(error?.message || '');
+    const cleanError = rawError
+      .replace(/AIza[a-zA-Z0-9_\-]{35}/g, '[REDACTED_KEY]')
+      .replace(/key=[^&\s]+/gi, 'key=[HIDDEN]')
+      .replace(/https?:\/\/[^\s]+/gi, '[SECURE_SERVICE]');
+
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: error.message || 'Gemini processing error' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({ error: cleanError || 'A temporary error occurred while processing your study question.' }),
     };
   }
 }

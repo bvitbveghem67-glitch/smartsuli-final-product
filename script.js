@@ -850,7 +850,9 @@ async function sendChatToGemini(userText) {
     chatHistory.push({ role: "model", text: reply });
   } catch (err) {
     typingIndicator.remove();
-    appendMessage("error", `Could not connect to study assistant: ${err.message}`);
+    const errMsg = String(err.message || '').replace(/AIza[a-zA-Z0-9_\-]{35}/g, '[REDACTED_KEY]');
+    const prefix = currentLang === 'ckb' ? 'نەتوانرا پەیوەندی بە یاریدەدەری خوێندن بکرێت' : currentLang === 'ar' ? 'تعذر الاتصال بالمساعد الدراسي' : 'Could not connect to study assistant';
+    appendMessage("error", `${prefix}: ${errMsg}`);
   } finally {
     isGenerating = false;
     if (chatSendBtn) chatSendBtn.disabled = false;
