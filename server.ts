@@ -13,13 +13,16 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.disable('x-powered-by');
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.text({ limit: '10mb' }));
 
-// CORS & Global Headers
+// Global CORS & Header Middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Access-Control-Max-Age', '86400');
   res.setHeader('X-Content-Type-Options', 'nosniff');
 
   if (req.method === 'OPTIONS') {
@@ -28,30 +31,42 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Security Middleware: Protect secrets and internals
+// Security Middleware: Keep secrets and backend internals protected
 app.use((req: Request, res: Response, next: NextFunction) => {
   const reqPath = req.path.toLowerCase();
 
-  const forbiddenPatterns = [
+  if (
+    reqPath === '/api/chat' ||
+    reqPath === '/api/chat/' ||
+    reqPath === '/.netlify/functions/chat' ||
+    reqPath === '/.netlify/functions/chat/' ||
+    reqPath === '/chat' ||
+    reqPath === '/chat/' ||
+    reqPath.startsWith('/api/') ||
+    reqPath.startsWith('/.netlify/functions/')
+  ) {
+    return next();
+  }
+
+  const protectedPatterns = [
     '/.env',
     '/.git',
-    '/server.',
+    '/server.js',
+    '/server.ts',
+    '/api/chat.js',
+    '/netlify/functions',
     '/package.json',
     '/bun.lock',
     '/tsconfig.json',
     '/metadata.json',
-    '/api/',
-    '/netlify/',
+    '/netlify.toml',
   ];
 
-  const isForbidden = forbiddenPatterns.some((pattern) => {
-    if (pattern === '/api/' && (reqPath === '/api/chat' || reqPath === '/api/chat/')) {
-      return false;
-    }
-    return reqPath.startsWith(pattern) || reqPath.includes(pattern);
+  const isProtected = protectedPatterns.some((pattern) => {
+    return reqPath === pattern || reqPath.startsWith(pattern + '/');
   });
 
-  if (isForbidden) {
+  if (isProtected) {
     return res.status(403).json({ error: 'Access forbidden.' });
   }
 
@@ -62,39 +77,59 @@ const handleChatRoute = (req: Request, res: Response) => {
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
-  if (req.method === 'GET') {
-    return res.status(200).json({
-      status: 'active',
-      service: 'Academic Study Assistant API',
-      ready: true,
-    });
-  }
-  if (req.method === 'POST') {
-    return chatHandler(req, res);
-  }
-  return res.status(200).json({ status: 'ok' });
+  return chatHandler(req, res);
 };
 
-app.all(['/api/chat', '/api/chat/'], handleChatRoute);
-app.all(['/.netlify/functions/chat', '/.netlify/functions/chat/'], handleChatRoute);
+const apiRoutes = [
+  '/api/chat',
+  '/api/chat/',
+  '/.netlify/functions/chat',
+  '/.netlify/functions/chat/',
+  '/chat',
+  '/chat/',
+  '/api',
+  '/api/',
+];
+
+app.all(apiRoutes, handleChatRoute);
 app.all('/api/*', handleChatRoute);
 app.all('/.netlify/functions/*', handleChatRoute);
 
-app.use(express.static(__dirname));
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+    const hasMessagePayload =
+      (req.body && (req.body.message || req.body.prompt || Array.isArray(req.body.history))) ||
+      (req.query && (req.query.message || req.query.prompt || req.query.payload));
 
-app.get('/', (_req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+    if (hasMessagePayload) {
+      return chatHandler(req, res);
+    }
+  }
+  next();
 });
 
-app.get('/websitetestdesignchoosanm.html', (_req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+app.use(
+  express.static(__dirname, {
+    dotfiles: 'ignore',
+    index: false,
+  })
+);
+
+app.all(['/', '/index.html', '/websitetestdesignchoosanm.html'], (_req: Request, res: Response) => {
+  if (_req.method === 'GET' || _req.method === 'HEAD') {
+    return res.sendFile(path.join(__dirname, 'index.html'));
+  }
+  return res.status(200).json({ status: 'ok', service: 'Academic Study Assistant' });
 });
 
-app.get('*', (req: Request, res: Response) => {
-  if (req.path.startsWith('/api/') || req.path.startsWith('/.netlify/')) {
+app.all('*', (req: Request, res: Response) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/.netlify') || req.path.startsWith('/chat')) {
     return handleChatRoute(req, res);
   }
-  res.sendFile(path.join(__dirname, 'index.html'));
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    return res.sendFile(path.join(__dirname, 'index.html'));
+  }
+  return res.status(200).json({ status: 'active', ready: true });
 });
 
 app.listen(Number(PORT), '0.0.0.0', () => {
